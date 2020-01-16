@@ -23,7 +23,12 @@ ui <- dashboardPage(
     fluidRow(
       box("age", title = "Conversion by Age", plotOutput("age")),
       box("agegroup", title = "Conversion by Age Group", plotOutput("agegroup")),
-    )
+    ),
+    
+    fluidRow(
+      box("non", title = "Conversion vs Non-conversion by Marital Status", plotOutput("non")),
+      box("agemarital", title = "Conversions by Age and Marital status", plotOutput("agemarital"))
+    ),
   )
 )
 
@@ -98,9 +103,50 @@ server <- function(input, output) {
       xlab("Age") +
       ylab("Conversion Rate (%)") +
       theme(plot.title = element_text(hjust = 0.5))
-    
   )
   
+  # Conversion vs Non-conversion
+  conversionsByMaritalStatus <- conversionsDF %>%
+    group_by(Marital=marital, Conversion=conversion) %>%
+    summarise(Count=n())
+  
+  output$non <- renderPlot(
+    # pie chart
+    ggplot(conversionsByMaritalStatus, aes(x="", y=Count, fill=Marital)) +
+      geom_bar(width=1, stat = "identity", position=position_fill()) +
+      geom_text(aes(x=1.25, label=Count), position=position_fill(vjust = 0.5)) +
+      coord_polar("y") +
+      facet_wrap(~Conversion) +
+      ggtitle('Marital Status (0: Non Conversions, 1: Conversions)') +
+      theme(
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        plot.title=element_text(hjust=0.5),
+        legend.position='bottom'
+      )
+  )
+  
+  
+  # Conversions by age and marital status
+  
+  #### 5. Conversions by Age Groups & Marital Status ####
+  conversionsByAgeMarital <- conversionsDF %>%
+    group_by(AgeGroup=cut(age, breaks= seq(20, 70, by = 10)), Marital=marital) %>%
+    summarise(Count=n(), NumConversions=sum(conversion)) %>%
+    mutate(TotalCount=sum(Count)) %>%
+    mutate(ConversionRate=NumConversions/TotalCount)
+  conversionsByAgeMarital$AgeGroup <- as.character(conversionsByAgeMarital$AgeGroup)
+  conversionsByAgeMarital$AgeGroup[is.na(conversionsByAgeMarital$AgeGroup)] <- "70+"
+  
+  output$agemarital <- renderPlot(
+    # bar chart
+    ggplot(conversionsByAgeMarital, aes(x=AgeGroup, y=ConversionRate, fill=Marital)) +
+      geom_bar(width=0.5, stat="identity", position="dodge") +
+      ylab("Conversion Rate (%)") +
+      xlab("Age") +
+      ggtitle("Conversion Rates by Age and Marital Status") +
+      theme(plot.title=element_text(hjust=0.5))
+  )
   
 }
 
